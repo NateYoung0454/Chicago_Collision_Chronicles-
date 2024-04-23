@@ -1,0 +1,243 @@
+---
+title: "group project datasets"
+format: html
+editor: visual
+---
+
+## STAT-627 Group Project
+
+**Project Title:** "Chicago Collision Chronicles."
+
+**Group Members:** Murtaza Jawid, Kevin Norris, Yota Sugai, Nathan Young
+
+**Key Questions:**
+
+## Interesting variables:
+
+-   Crash Type
+
+    -   FIRST_CRASH_TYPE (Vehicle)
+
+    -   HIT_AND_RUN_I
+
+    -   CRASH_TYPE (Severity injuries)
+
+    -   MOST_SEVERE_INJURY
+
+    -   INJURIES_TOTAL
+
+    -   INJURIES_FATAL
+
+    -   INJURIES_INCAPACITATING
+
+    -   INJURIES_NON_INCAPACITATING
+
+    -   DAMAGE_numeric
+
+-   Street/Location
+
+    -   TRAFFICWAY_TYPE
+
+    -   ALIGNMENT
+
+    -   INTERSECTION_RELATED_I
+
+    -   NOT_RIGHT_OF_WAY_I
+
+    -   STREET_NO
+
+    -   STREET_DIRECTION. (East, North, West, South)
+
+    -   STREET_NAME
+
+    -   LATITUDE
+
+    -   LONGITUDE
+
+-   Conditions
+
+    -   LIGHTING_CONDITION
+
+    -   WEATHER_CONDITION
+
+    -   DEVICE_CONDITION
+
+    -   ROADWAY_SURFACE_COND
+
+    -   ROAD_DEFECT
+
+-   Policing
+
+    -   REPORT_TYPE
+
+    -   PRIM_CONTRIBUTORY_CAUSE #Primary cause
+
+    -   SEC_CONTRIBUTORY_CAUSE #Secondary cause
+
+    -   BEAT_OF_OCCURRENCE
+
+    -   PHOTOS_TAKEN_I
+
+    -   STATEMENTS_TAKEN_I
+
+    -   NUM_UNITS (Number of Police vehicles on site)
+
+-   Time
+
+    -   DATE_POLICE_NOTIFIED
+
+    -   CRASH_HOUR
+
+    -   CRASH_DAY_OF_WEEK
+
+    -   CRASH_MONTH
+
+```{r}
+# Load packages
+library(readr)
+library(tidyverse)
+library(MASS)
+library(ISLR2)
+library(leaps)
+library(dplyr)
+library(ggplot2)
+```
+
+```{r}
+# Read data (Takes awhile)
+carcrashes <- read_csv("Traffic_Crashes.csv")
+# From https://data.cityofchicago.org/Transportation/Traffic-Crashes-Crashes/85ca-t3if/about_data
+```
+
+This data contains over 800,000 car crashes in Chicago from 01/01/2016 to 12/31/2023.
+
+```{r}
+# Weather condition Variables
+unique(carcrashes$WEATHER_CONDITION)
+unique(carcrashes$LIGHTING_CONDITION)
+unique(carcrashes$WORK_ZONE_I)
+unique(carcrashes$WORK_ZONE_TYPE)
+unique(carcrashes$ROADWAY_SURFACE_COND)
+```
+
+```{r}
+# Converting key variables to factors
+carcrashes <- carcrashes %>%
+  mutate(
+    WEATHER_CONDITION = factor(WEATHER_CONDITION, levels = c("CLEAR", "SNOW", "UNKNOWN", "RAIN", "CLOUDY/OVERCAST", "FOG/SMOKE/HAZE", "BLOWING SNOW", "FREEZING RAIN/DRIZZLE", "OTHER", "SEVERE CROSS WIND GATE", "SLEET/HAIL", "BLOWING SAND, SOIL, DIRT")),
+    LIGHTING_CONDITION = factor(LIGHTING_CONDITION, levels = c("DAYLIGHT", "DARKNESS, LIGHTED ROAD", "DARKNESS", "UNKNOWN", "DUSK", "DAWN")),
+    ROADWAY_SURFACE_COND = factor(ROADWAY_SURFACE_COND, levels = c("DRY", "UNKNOWN","SNOW OR SLUSH","WET","OTHER","ICE","SAND, MUD, DIRT")),
+    DAMAGE = factor(DAMAGE, levels = c("$500 OR LESS", "$501 - $1,500", "OVER $1,500"), ordered = TRUE),
+    DAMAGE = as.numeric(DAMAGE) *500)
+```
+
+```{r}
+# Identify Variable Range
+min(carcrashes$LATITUDE)
+max(carcrashes$LATITUDE)
+min(carcrashes$LONGITUDE)
+max(carcrashes$LONGITUDE)
+ggplot(carcrashes, aes(y = LATITUDE)) +
+  geom_boxplot()
+```
+
+```{r}
+# Run for DF summary
+head(carcrashes)
+summary(carcrashes)
+```
+
+```{r}
+glimpse(carcrashes)
+```
+
+# Questions
+
+-   Predict damage cost based on numerical predictors such as speed limit and other conditions
+
+    ```{r}
+
+    ```
+
+    ```{r}
+    # Injury prediction models
+    Injuries_Model <- lm(INJURIES_TOTAL ~ POSTED_SPEED_LIMIT+ DAMAGE + CRASH_HOUR +CRASH_DAY_OF_WEEK+ CRASH_MONTH, data = carcrashes)
+    Injuries_Model
+    summary(Injuries_Model)
+    # Fatal Injuries Model
+    damage_model_fatal <- lm(INJURIES_FATAL ~ POSTED_SPEED_LIMIT+ DAMAGE + CRASH_HOUR + CRASH_DAY_OF_WEEK+CRASH_MONTH, data = carcrashes)
+    damage_model_fatal
+    summary(damage_model_fatal)
+    # Damage Cost Model
+    damagecost <- lm(DAMAGE ~ INJURIES_TOTAL + POSTED_SPEED_LIMIT + CRASH_HOUR +CRASH_DAY_OF_WEEK+ CRASH_MONTH, data = carcrashes)
+    damagecost
+    summary(damagecost)
+    ```
+
+# Project commentary
+
+There are only 0.1% total fatalities in the data which means you are talking about anomaly detection which may require more advanced model. Your model would have to be better than 99.9% accurate to better than just saying no fatalities. Perhaps classify if there were any injuries as that is about 19%. Suggest selecting a smaller random sample for development, say 50, 000 rows, just ofr speed of response and then increasing to the full data set when you think you ahve a reasonable model.
+
+```{r}
+# Divide into training and testing
+set.seed(123)
+# Sample 50,000 rows for the training set
+Z <- sample(nrow(carcrashes), 50000)
+carcrashes_train <- carcrashes[Z,]
+# Remaining rows for the test set
+carcrashes_test <- carcrashes[-Z,]
+```
+
+## Ideas Part 2
+
+1.  Predicting injuries
+
+    1.  PCA/PCR
+
+2.  Predict speed limit based on if crash resulted in injury?
+
+    1.  Plots
+
+3.  Polynomial Regression: Account for potential non-linear relationships between predictors and damage cost
+
+4.  Decision trees: Capture interactions and non-linearities in the data to predict damage cost
+
+5.  Does it take longer for police to be notified after a crash depending on the severity of the accident?
+
+6.  Where are crashes most likely? Use location variables from earlier.
+
+    1.  Most dangerous streets?
+
+    2.  Plot graph for latitude and longitude of crashes via ggplot. change icon or color based on variable such as:
+
+        1.  Weather
+
+        2.  Location
+
+        3.  Cost
+
+        4.  Severity
+
+7.  Plot number of accidents vs day of the week and time of day.
+
+    1.  Filter for crashes on weekends vs weekdays to identify differences.
+
+## Data setup steps
+
+1.  Filter out rows with null values or unknown? See how much that reduces size of dataset.
+
+2.  Identify all categorical variables to convert to factors
+
+3.  Convert crash date variable into useful variable?
+
+```{r}
+filtered_carcrashes <- carcrashes %>%
+  filter(!is.na(LONGITUDE), !is.na(LATITUDE), LONGITUDE != 0, LATITUDE != 0)
+```
+
+```{r}
+# Idea: overlay the map of the city of chicago on ggplot
+ggplot(filtered_carcrashes, aes(x = LONGITUDE, y = LATITUDE, color = DAMAGE, shape = ROAD_DEFECT)) +
+  geom_point() +
+  labs(x = "Longitude", y = "Latitude", title = "Plot of Latitude vs Longitude")
+```

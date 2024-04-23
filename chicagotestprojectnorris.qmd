@@ -1,0 +1,162 @@
+---
+title: "Chicago Crashes Classification Modeling"
+format: html
+editor: visual
+---
+
+## Chicago Collision Chronicles
+
+Question of Interest: Can we predict the severity of injuries (eg. minor, moderate, severe) in car crashes using similar attributes, (i.e. weather conditions, lighting conditions and road surface conditions?
+
+Importing the Data:
+
+```{r}
+# Load packages
+library(readr)
+library(tidyverse)
+library(MASS)
+library(ISLR2)
+library(leaps)
+library(dplyr)
+library(ggplot2)
+library(caret)
+library(nnet)
+library(class)
+```
+
+```{r}
+carcrashdata <- read_csv("Traffic_Crashes.csv", show_col_types = FALSE)
+```
+
+```{r}
+variables <- colnames(carcrashdata)
+print(variables)
+```
+
+```{r}
+# Subset the dataset to remove NA values from MOST_SEVERE_INJURY amd others
+carcrashdata <- carcrashdata[complete.cases(carcrashdata$MOST_SEVERE_INJURY,
+                                                  carcrashdata$WEATHER_CONDITION,
+                                                  carcrashdata$LIGHTING_CONDITION,
+                                                  carcrashdata$ROADWAY_SURFACE_COND), ]
+
+# Converting key variables to factors
+carcrashdata <- carcrashdata %>%
+  mutate(
+    WEATHER_CONDITION = factor(WEATHER_CONDITION, levels = c("CLEAR", "SNOW", "UNKNOWN", "RAIN", "CLOUDY/OVERCAST", "FOG/SMOKE/HAZE", "BLOWING SNOW", "FREEZING RAIN/DRIZZLE", "OTHER", "SEVERE CROSS WIND GATE", "SLEET/HAIL", "BLOWING SAND, SOIL, DIRT")),
+    LIGHTING_CONDITION = factor(LIGHTING_CONDITION, levels = c("DAYLIGHT", "DARKNESS, LIGHTED ROAD", "DARKNESS", "UNKNOWN", "DUSK", "DAWN")),
+    ROADWAY_SURFACE_COND = factor(ROADWAY_SURFACE_COND, levels = c("DRY", "UNKNOWN","SNOW OR SLUSH","WET","OTHER","ICE","SAND, MUD, DIRT")),
+    DAMAGE = factor(DAMAGE, levels = c("$500 OR LESS", "$501 - $1,500", "OVER $1,500"), ordered = TRUE),
+    DAMAGE = as.numeric(DAMAGE) *500)
+```
+
+```{r}
+# Convert MOST_SEVERE_INJURY into a factor
+carcrashdata$MOST_SEVERE_INJURY <- factor(carcrashdata$MOST_SEVERE_INJURY)
+
+# Identify unique levels of MOST_SEVERE_INJURY
+levels <- unique(carcrashdata$MOST_SEVERE_INJURY)
+print(levels)
+
+# Define a vector to rank the levels of MOST_SEVERE_INJURY
+severity_rank <- c("NO INDICATION OF INJURY", "REPORTED, NOT EVIDENT", "NONINCAPACITATING INJURY", "INCAPACITATING INJURY", "FATAL")
+
+# Convert levels to a factor with specified order
+carcrashdata$MOST_SEVERE_INJURY <- factor(carcrashdata$MOST_SEVERE_INJURY, levels = severity_rank)
+
+# Recode levels to binary values
+carcrashdata$MINOR_MAJOR_INJURY <- carcrashdata$MOST_SEVERE_INJURY %>%
+  recode("NO INDICATION OF INJURY" = 0, "REPORTED, NOT EVIDENT" = 0, 
+         "NONINCAPACITATING INJURY" = 0,
+         "INCAPACITATING INJURY" = 1, "FATAL" = 1)
+```
+
+```{r}
+# Divide into training and testing
+set.seed(123)
+# Sample 50,000 rows for the training set
+Z <- sample(nrow(carcrashdata), 50000)
+carcrash.train <- carcrashdata[Z,]
+# Remaining rows for the test set
+carcrash.test <- carcrashdata[-Z,]
+```
+
+```{r}
+# Fit a multinomial logistic regression model
+carcrash.model <- multinom(MOST_SEVERE_INJURY ~ WEATHER_CONDITION + LIGHTING_CONDITION + ROADWAY_SURFACE_COND, data = carcrash.train)
+
+# Print model summary
+summary(carcrash.model)
+
+```
+
+```{r}
+# Predict probabilities for each level of injury severity in the test data
+carcrash.predict <- predict(carcrash.model, newdata = carcrash.test, type = "probs")
+
+# Calculate the average predicted probabilities for each level of injury severity
+avg_probabilities <- colMeans(carcrash.predict)
+
+# Output the average predicted probabilities
+print(avg_probabilities)
+
+```
+
+```{r}
+# Fit LDA model
+lda_model <- lda(MINOR_MAJOR_INJURY ~ WEATHER_CONDITION + LIGHTING_CONDITION + ROADWAY_SURFACE_COND, data = carcrashdata)
+
+# Summary of LDA model
+summary(lda_model)
+
+```
+
+```{r}
+# Predict using the LDA model
+predictions <- predict(lda_model, newdata = carcrash.test)
+
+head(predictions)
+
+# If you want the posterior probabilities of each class, you can also extract them
+posterior_probs <- predictions$posterior
+head(posterior_probs)
+
+# Calculate average posterior probabilities for each class
+avg_posterior_class_0 <- mean(posterior_probs[, "0"])
+avg_posterior_class_1 <- mean(posterior_probs[, "1"])
+
+# Output the average posterior probabilities
+avg_posterior_class_0
+avg_posterior_class_1
+
+# Alternatively, if you just want the predicted class for each observation, you can use the type = "response" argument
+predicted_classes <- predict(lda_model, newdata = carcrash.test, type = "response")
+
+```
+
+```{r}
+# Fit logistic regression model
+logit_model <- glm(MINOR_MAJOR_INJURY ~ WEATHER_CONDITION + LIGHTING_CONDITION + ROADWAY_SURFACE_COND, 
+                   data = carcrash.train, 
+                   family = binomial)
+
+# Summary of logistic regression model
+summary(logit_model)
+```
+
+```{r}
+#LOOCV
+colnames(carcrash.train)
+
+# Perform one-hot encoding
+carcrash.train <- model.matrix(~ . - 1, data = carcrash.train[, c("WEATHER_CONDITION", "LIGHTING_CONDITION", "ROADWAY_SURFACE_COND")])
+carcrash.test <- model.matrix(~ . - 1, data = carcrash.test[, c("WEATHER_CONDITION", "LIGHTING_CONDITION", "ROADWAY_SURFACE_COND")])
+
+# Convert response variable to factor
+carcrash.train$MINOR_MAJOR_INJURY <- as.factor(carcrash.train$MINOR_MAJOR_INJURY)
+carcrash.test$MINOR_MAJOR_INJURY <- as.factor(carcrash.test$MINOR_MAJOR_INJURY)
+```
+
+```{r}
+
+```

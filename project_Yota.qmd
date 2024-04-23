@@ -1,0 +1,119 @@
+---
+title: "Logistic regression analysis of Fatal crashes"
+format: html
+editor: visual
+---
+
+```{r}
+# Load packages
+library(readr)
+library(tidyverse)
+library(MASS)
+library(ISLR2)
+library(leaps)
+library(dplyr)
+library(ggplot2)
+```
+
+```{r}
+# Read data (Takes awhile)
+carcrashes <- read_csv("Traffic_Crashes_-_Crashes.csv")
+# From https://urldefense.com/v3/__https://data.cityofchicago.org/Transportation/Traffic-Crashes-Crashes/85ca-t3if/about_data__;!!IaT_gp1N!zWOy5Bcl6DBvja5nTs5cJ3XbnV7ssBzAfEmvBz6YvKBtIqhZuDRr4eNjuL1qOZUirWyKprlGHd_JtXy3QvOmj-Lm-evgEOcq$ 
+```
+
+```{r}
+# Converting key variables to factors
+carcrashes <- carcrashes %>%
+  mutate(
+    WEATHER_CONDITION = factor(WEATHER_CONDITION, levels = c("CLEAR", "SNOW", "UNKNOWN", "RAIN", "CLOUDY/OVERCAST", "FOG/SMOKE/HAZE", "BLOWING SNOW", "FREEZING RAIN/DRIZZLE", "OTHER", "SEVERE CROSS WIND GATE", "SLEET/HAIL", "BLOWING SAND, SOIL, DIRT")),
+    LIGHTING_CONDITION = factor(LIGHTING_CONDITION, levels = c("DAYLIGHT", "DARKNESS, LIGHTED ROAD", "DARKNESS", "UNKNOWN", "DUSK", "DAWN")),
+    ROADWAY_SURFACE_COND = factor(ROADWAY_SURFACE_COND, levels = c("DRY", "UNKNOWN","SNOW OR SLUSH","WET","OTHER","ICE","SAND, MUD, DIRT")),
+    DAMAGE = factor(DAMAGE, levels = c("$500 OR LESS", "$501 - $1,500", "OVER $1,500"), ordered = TRUE),
+    DAMAGE = as.numeric(DAMAGE) *500)
+```
+
+```{r}
+# Converting FIRST_CRASH_TYPE variable to factor
+unique(carcrashes$FIRST_CRASH_TYPE)
+carcrashes <- carcrashes %>%
+  mutate(
+    FIRST_CRASH_TYPE = factor(FIRST_CRASH_TYPE, levels = c("REAR END", "PARKED MOTOR VEHICLE", "PEDALCYCLIST", "PEDESTRIAN", "FIXED OBJECT", 
+                             "TURNING", "ANGLE", "SIDESWIPE SAME DIRECTION", "SIDESWIPE OPPOSITE DIRECTION", 
+                             "REAR TO SIDE", "HEAD ON", "REAR TO FRONT", "OTHER OBJECT", "ANIMAL", 
+                             "OTHER NONCOLLISION", "OVERTURNED", "REAR TO REAR", "TRAIN")
+))
+
+```
+
+```{r}
+unique(carcrashes$TRAFFICWAY_TYPE)
+
+carcrashes <- carcrashes %>%
+  mutate(
+    TRAFFICWAY_TYPE = factor(TRAFFICWAY_TYPE, levels = c("OTHER", "DIVIDED - W/MEDIAN (NOT RAISED)", "NOT DIVIDED", "ONE-WAY",
+                                   "FOUR WAY", "PARKING LOT", "DIVIDED - W/MEDIAN BARRIER", "T-INTERSECTION",
+                                   "UNKNOWN", "RAMP", "ALLEY", "DRIVEWAY", "UNKNOWN INTERSECTION TYPE",
+                                   "TRAFFIC ROUTE", "FIVE POINT, OR MORE", "NOT REPORTED", "CENTER TURN LANE",
+                                   "L-INTERSECTION", "Y-INTERSECTION", "ROUNDABOUT")
+    ))
+
+            
+```
+
+
+## Logistic Regression model for Fatal Accident
+```{r}
+# Create new column that returns 1 when injuries is fatal, 0 otherwise.
+carcrashes <- carcrashes %>%
+  mutate(FATAl_ACCIDENT = ifelse(INJURIES_FATAL > 0, 1, 0))
+
+
+# First Logistic model
+# FATAL_Logistic <- glm(FATAl_ACCIDENT ~ CRASH_HOUR + WEATHER_CONDITION + LIGHTING_CONDITION + as.factor(CRASH_DAY_OF_WEEK) + ROADWAY_SURFACE_COND + POSTED_SPEED_LIMIT+FIRST_CRASH_TYPE, data = carcrashes, family = binomial)
+
+# Took out significant variables
+FATAL_Logistic <- glm(FATAl_ACCIDENT ~ CRASH_HOUR  + LIGHTING_CONDITION + POSTED_SPEED_LIMIT + FIRST_CRASH_TYPE, 
+             family = binomial, data = carcrashes)
+
+summary(FATAL_Logistic)
+
+
+# Omiting LANE_CNT since it had too many missing values and could not conduct stepwise ( + FIRST_CRASH_TYPE,)
+#na_counts <- 
+ #colSums(is.na(carcrashes[, c("CRASH_HOUR", "WEATHER_CONDITION", "LIGHTING_CONDITION", 
+                                          #"CRASH_DAY_OF_WEEK", "ROADWAY_SURFACE_COND", 
+                                          #"POSTED_SPEED_LIMIT","FIRST_CRASH_TYPE","TRAFFICWAY_TYPE")]))
+# print(na_counts)
+
+```
+
+```{r}
+# Stepwise selection
+# step_model <- step(FATAL_Logistic, direction = "both")
+# summary(step_model)
+
+# I ran the stepwise and AIC did not improve.
+```
+
+## Calculate the Misclassification rate
+```{r}
+# Filter out observations with missing values 
+carcrashes_complete <- carcrashes[!is.na(carcrashes$FATAl_ACCIDENT), ]
+
+set.seed(123) 
+train_index <- sample(nrow(carcrashes_complete), 0.8 * nrow(carcrashes_complete))  # 80% train, 20% test
+train_data <- carcrashes_complete[train_index, ]
+test_data <- carcrashes_complete[-train_index, ]
+
+model <- glm(FATAl_ACCIDENT ~ CRASH_HOUR + LIGHTING_CONDITION + POSTED_SPEED_LIMIT + FIRST_CRASH_TYPE, 
+             family = binomial, data = train_data)
+
+predicted <- predict(model, newdata = test_data, type = "response")
+
+predicted_class <- ifelse(predicted > 0.5, 1, 0)  
+actual_class <- test_data$FATAl_ACCIDENT 
+
+misclassification_rate <- mean(predicted_class != actual_class)
+print(paste("Misclassification Rate:", misclassification_rate))
+```
+
