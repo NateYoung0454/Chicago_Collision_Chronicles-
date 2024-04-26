@@ -286,8 +286,6 @@ summary(logit_model)
 
 ## Logistic Regression model for Fatal Accidents
 
-Next, to predict the likelihood of fatal accidents, we utilizeed logistic regression. We started with transforming the dataset by creating the new variable which shows if the injury from the accident resulted in the fatal. After training the logistic regression model on the training data, it predicts the probability of fatal accidents on the test data. Finally, I evaluated the model's performance by calculating the misclassification rate.
-
 ```{r}
 carcrashdata <- carcrashdata %>%
   mutate(FATAl_ACCIDENT = ifelse(INJURIES_FATAL > 0, 1, 0))
@@ -574,7 +572,7 @@ tibble("Model" = c("Unpruned Decision Tree", "Pruned Decision Tree", "LDA",
 # Appendix
 
 | Group Member  | Responsabilities                                                                  |
-|-----------------------|------------------------------------------------|
+|-----------------------|-------------------------------------------------|
 | Kevin Norris  | Introduction, LDA, Logistic Regression, Majority of writing, editing, formatting. |
 | Nathan Young  | Simple Linear Regression, Decision tree, mapping, LDA, QDA, Github, some writing. |
 | Yota          | Multinomial Regression                                                            |
